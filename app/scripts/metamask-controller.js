@@ -6980,6 +6980,24 @@ export default class MetamaskController extends EventEmitter {
           this.controllerMessenger,
           'SnapController:get',
         ),
+
+        /**
+         * Track an error in the context of a Snap.
+         *
+         * @param {object} error - The error to track.
+         * @param {string} error.name - The name of the error.
+         * @param {string} error.message - The error message.
+         * @param {object} error.stack - The error stack trace.
+         * @returns {string} The error ID of the tracked error.
+         */
+        trackError: (error) => {
+          const deserializedError = new Error(error.message);
+          deserializedError.name = error.name;
+          deserializedError.stack = error.stack;
+
+          return captureException(deserializedError);
+        },
+
         trackEvent: this.metaMetricsController.trackEvent.bind(
           this.metaMetricsController,
         ),
