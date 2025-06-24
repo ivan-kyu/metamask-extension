@@ -2,8 +2,8 @@
 module.exports = {
   content: [
     './ui/**/*.{js,jsx,ts,tsx}',
-    './node_modules/@metamask/design-system-react/**/*.{js,jsx,ts,tsx,cjs,mjs}',
-    './node_modules/@metamask/design-system-react/**/*.{cjs,mjs}',
+    // Ensures tailwind classnames are generated for design system components
+    './node_modules/@metamask/design-system-react/**/*.{mjs,cjs}',
   ],
   presets: [
     // eslint-disable-next-line node/global-require

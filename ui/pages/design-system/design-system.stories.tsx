@@ -34,12 +34,12 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 
 const meta: Meta = {
-  title: '@metamask/design-system-react example',
+  title: 'Design System/Example Screen',
   component: () => null,
   // Remove default padding
   decorators: [
     (Story) => (
-      <Box className="m-[-1rem]">
+      <Box className="-m-4">
         <Story />
       </Box>
     ),
