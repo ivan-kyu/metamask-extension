@@ -3794,6 +3794,10 @@ export default class MetamaskController extends EventEmitter {
         appStateController.setEnableEnforcedSimulationsForTransaction.bind(
           appStateController,
         ),
+      setEnforcedSimulationsSlippageForTransaction:
+        appStateController.setEnforcedSimulationsSlippageForTransaction.bind(
+          appStateController,
+        ),
 
       // EnsController
       tryReverseResolveAddress:

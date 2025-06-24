@@ -52,5 +52,7 @@ export type ConfirmMetamaskState = {
     upgradeSplashPageAcknowledgedForAccounts?: string[];
     enableEnforcedSimulations: boolean;
     enableEnforcedSimulationsForTransactions: Record<string, boolean>;
+    enforcedSimulationsSlippage: number;
+    enforcedSimulationsSlippageForTransactions: Record<string, number>;
   };
 };

@@ -52,3 +52,19 @@ export function selectEnableEnforcedSimulations(
     state.metamask.enableEnforcedSimulations
   );
 }
+
+export function selectEnforcedSimulationsDefaultSlippage(
+  state: ConfirmMetamaskState,
+): number {
+  return state.metamask.enforcedSimulationsSlippage;
+}
+
+export function selectEnforcedSimulationsSlippage(
+  state: ConfirmMetamaskState,
+  transactionId: string,
+): number {
+  return (
+    state.metamask.enforcedSimulationsSlippageForTransactions[transactionId] ??
+    state.metamask.enforcedSimulationsSlippage
+  );
+}
