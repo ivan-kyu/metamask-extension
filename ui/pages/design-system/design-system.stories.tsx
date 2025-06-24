@@ -34,7 +34,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 
 const meta: Meta = {
-  title: 'Pages/Design System',
+  title: '@metamask/design-system-react example',
   component: () => null,
   // Remove default padding
   decorators: [
