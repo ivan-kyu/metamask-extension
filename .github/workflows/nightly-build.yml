@@ -1,0 +1,143 @@
+name: Nightly Build
+
+on:
+  push:
+    branches:
+      - INFRA-2663-nightlybuilds
+  # schedule:
+    # Run the full suite "overnight," once every half hour from 1:00am UTC until 2:59am UTC.
+    # This helps with "Top 10 failed tests on the metamask-extension repository main branch,"
+    # especially the Monday morning list, which is otherwise usually a fake empty.
+    # - cron: '0,30 1-2 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !(contains(github.ref, 'refs/heads/main') || contains(github.ref, 'refs/heads/master')) }}
+
+env:
+  # For a `pull_request` event, the branch is `github.head_ref``.
+  # For a `push` event, the branch is `github.ref_name`.
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  # For a `pull_request` event, the fork is `github.event.pull_request.head.repo.fork`.
+  # For a `push` event, the fork is `github.event.repository.fork`.
+  IS_FORK: ${{ github.event.pull_request.head.repo.fork || github.event.repository.fork }}
+  HOST_URL: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}
+  DOWNLOAD_URL: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}/build-dist-browserify.zip
+
+permissions:
+  contents: write # required for releases
+  id-token: write # required for s3 uploads
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package-version.outputs.version }}
+    steps:
+      - name: Checkout and setup environment
+        uses: MetaMask/action-checkout-and-setup@v1
+        with:
+          is-high-risk-environment: false
+          cache-node-modules: true
+          skip-allow-scripts: true
+          yarn-custom-url: ${{ vars.YARN_URL }}
+
+      - name: Get package version
+        id: package-version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+  prep-deps:
+    runs-on: ubuntu-latest
+    needs:
+      - get-version
+    steps:
+      - name: Checkout and setup environment
+        uses: MetaMask/action-checkout-and-setup@v1
+        with:
+          is-high-risk-environment: false
+          cache-node-modules: true
+          skip-allow-scripts: true
+          yarn-custom-url: ${{ vars.YARN_URL }}
+
+  lint-workflows:
+    name: Lint workflows
+    uses: metamask/github-tools/.github/workflows/lint-workflows.yml@1299bb1de0c6974ae6d0a32c7e8897fe168239ac
+
+  test-lint:
+    needs:
+      - prep-deps
+    uses: ./.github/workflows/test-lint.yml
+
+  test-circular-deps:
+    name: Test circular deps
+    needs:
+      - prep-deps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout and setup environment
+        uses: MetaMask/action-checkout-and-setup@v1
+        with:
+          is-high-risk-environment: false
+          skip-allow-scripts: true
+          yarn-custom-url: ${{ vars.YARN_URL }}
+
+  repository-health-checks:
+    needs:
+      - prep-deps
+    uses: ./.github/workflows/repository-health-checks.yml
+
+  build-dist-browserify:
+    uses: ./.github/workflows/run-build.yml
+    with:
+      build-name: build-dist-browserify
+      build-command: 'yarn build dist'
+    secrets: inherit
+
+  print-artifact-links:
+    name: Print artifact download links
+    needs:
+      - build-dist-browserify
+      - get-version
+    runs-on: ubuntu-latest
+    env:
+      DOWNLOAD_URL_CHROME: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}/build-dist-browserify/builds/metamask-chrome-${{ needs.get-version.outputs.version }}.zip
+      DOWNLOAD_URL_FIREFOX: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}/build-dist-browserify/builds/metamask-firefox-${{ needs.get-version.outputs.version }}.zip
+    steps:
+      - name: Print download links
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo ""
+          echo "📋 Artifact download links:"
+          echo "S3 Bucket: ${{ vars.AWS_S3_BUCKET }}"
+          echo "IAM Role: ${{ vars.AWS_IAM_ROLE }}"
+          echo "🔑 Host URL: ${{ env.HOST_URL }}"
+          echo "Build Main Chrome: ${{ env.DOWNLOAD_URL_CHROME }}, Firefox: ${{ env.DOWNLOAD_URL_FIREFOX }}"
+
+  post-slack-notification:
+    name: Post nightly build notification to Slack
+    needs:
+      - build-dist-browserify
+      - get-version
+      - print-artifact-links
+    runs-on: ubuntu-latest
+    env:
+      DOWNLOAD_URL_CHROME: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}/build-dist-browserify/builds/metamask-chrome-${{ needs.get-version.outputs.version }}.zip
+      DOWNLOAD_URL_FIREFOX: ${{ vars.AWS_CLOUDFRONT_URL }}/${{ github.event.repository.name }}/${{ github.run_id }}/build-dist-browserify/builds/metamask-firefox-${{ needs.get-version.outputs.version }}.zip
+    steps:
+      - name: Checkout and setup environment
+        uses: MetaMask/action-checkout-and-setup@v1
+        with:
+          is-high-risk-environment: false
+          cache-node-modules: true
+          skip-allow-scripts: true
+          yarn-custom-url: ${{ vars.YARN_URL }}
+
+      - name: Post to Slack
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+          BRANCH: ${{ env.BRANCH }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          VERSION: ${{ needs.get-version.outputs.version }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: yarn tsx .github/scripts/post-nightly-builds.ts
